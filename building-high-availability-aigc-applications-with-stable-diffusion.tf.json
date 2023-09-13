@@ -1,0 +1,331 @@
+{
+    "terraform": {
+        "required_providers": [
+            {
+                "huaweicloud": {
+                    "source": "huawei.com/provider/huaweicloud",
+                    "version": "1.40.1"
+                }
+            }
+        ]
+    },
+    "provider": {
+        "huaweicloud": {
+            "cloud": "myhuaweicloud.com",
+            "endpoints": {
+                "iam": "iam.ap-southeast-3.myhuaweicloud.com",
+                "dns": "dns.ap-southeast-3.myhuaweicloud.com",
+                "bss": "bss-intl.myhuaweicloud.com"
+            },
+            "enterprise_project_id": "9200eae2-a9b2-4ebf-9df1-4c77fb88046d",
+            "insecure": true,
+            "region": "ap-southeast-3",
+            "auth_url": "https://iam.ap-southeast-3.myhuaweicloud.com/v3"
+        }
+    },
+    "variable": {
+        "vpc_name": {
+            "default": "high-availability-aigc-applications-demo",
+            "description": "Virtual Private Cloud (VPC) name. This template uses a newly created VPC and the VPC name must be unique. Default value: high-availability-aigc-applications-demo",
+            "type": "string",
+            "nullable": false
+        },
+        "security_group_name": {
+            "default": "high-availability-aigc-applications-demo",
+            "description": "Security group name. This template uses a newly created security group. For details about how to configure a security group rule, see the deployment guide. The value can contain 1 to 64 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). Default value: high-availability-aigc-applications-demo",
+            "type": "string",
+            "nullable": false
+        },
+        "ecs_name": {
+            "default": "high-availability-aigc-applications-demo",
+            "description": "ECS name, which must be unique. The name format is {ecs_name}-digit. It can contain 1 to 60 characters, including letters, digits, underscores (_), hyphens (-). and periods (.). Default value: high-availability-aigc-applications-demo",
+            "type": "string",
+            "nullable": false
+        },
+        "image_bucket_name": {
+            "default": "",
+            "description": "OBS bucket name, which is globally unique. The bucket is used to store automatically uploaded images saved on the web UI. The bucket name can contain 3 to 63 characters, including lowercase letters, digits, hyphens (-), and periods (.). Do not start or end with a hyphen (-) or a period (.).",
+            "type": "string",
+            "nullable": "false",
+            "validation": {
+                "condition": "${length(regexall(\"^[a-z0-9][a-z0-9-\\\\.]{1,61}[a-z0-9]$\",var.image_bucket_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_count": {
+            "default": 2,
+            "description": "Number of ECSs, which is greater than or equal to 1. The maximum number of ECSs is determined by the user quota. For details, see the deployment guide. Default value: 2",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[1-9]\\\\d*$\",var.ecs_count))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_flavor": {
+            "default": "pi2.2xlarge.4",
+            "description": "ECS flavor. This template uses a GPU-accelerated flavor. For details about flavors, see the deployment guide. Default value: pi2.2xlarge.4(8vCPUs|32GiB|T4-16GiB)",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z][a-z0-9]{0,3}\\\\.)(([1-9][0-9]{0,1}x)large\\\\.)[1-9][0-9]{0,1}$\",var.ecs_flavor))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_password": {
+            "default": "",
+            "description": "Initial password of the ECS. After the ECS is created, reset the password by referring to the deployment guide. It can contain 8 to 26 characters, including at least three of the following character types: uppercase letters, lowercase letters, digits, and special characters (!@$%^-_=+[{()}]:,./?~#*). The default administrator account is root.",
+            "type": "string",
+            "nullable": false,
+            "sensitive": true
+        },
+        "elb_name": {
+            "default": "high-availability-aigc-applications-demo",
+            "description": "ELB name, which can contain 1 to 64 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). Default value: high-availability-aigc-applications-demo",
+            "type": "string",
+            "nullable": "false"
+        },
+        "eip_bandwidth_size": {
+            "default": 300,
+            "description": "EIP bandwidth, which is billed by traffic. Value range: 1-300 Mbit/s. Default value: 300Mbit/s",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([1-9][0-9]{0,1}|[1-2][0-9]{2}|300)$\",var.eip_bandwidth_size))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "charging_mode": {
+            "default": "postPaid",
+            "description": "ECS billing mode. By default, expenses are automatically deducted. The value can be prePaid (yearly/monthly) or postPaid (pay-per-use). Default value: postPaid",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"postPaid\",\"prePaid\"], var.charging_mode)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_unit": {
+            "default": "month",
+            "description": "Unit of a subscription period. This parameter is valid and mandatory only when charging_mode is set to prePaid. The value can be month or year. Default value: month",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"month\",\"year\"], var.charging_unit)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_period": {
+            "default": 1,
+            "description": "Subscription period. This parameter is valid and mandatory only when charging_mode is prePaid. Value range: If charge_period_unit is set to month, the value range is from 1 to 9. If charge_period_unit is set to year, the value range is from 1 to 3. Default value: 1 month",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[1-9]$\",var.charging_period))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "access_key_id": {
+            "default": "",
+            "description": "Access Key ID (AK), which is used to verify the identity of a user attempting to upload the generated images to the OBS bucket. It is a string of 20 characters that can contain only uppercase letters and digits. To obtain the value, see the deployment guide.",
+            "type": "string",
+            "nullable": false,
+            "sensitive": true,
+            "validation": {
+                "condition": "${length(regexall(\"^[A-Z0-9]{20}$\",var.access_key_id))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "secret_access_key": {
+            "default": "",
+            "description": "Secret Access Key (SK), which is used to sign requests. It must be used together with the AK to authenticate image upload requests. It is a string of 40 characters that can contain only uppercase letters, lowercase letters, and digits. To obtain the value, see the deployment guide.",
+            "type": "string",
+            "nullable": false,
+            "sensitive": true,
+            "validation": {
+                "condition": "${length(regexall(\"^[A-Za-z0-9]{40}$\",var.secret_access_key))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        }
+    },
+    "data": {
+        "huaweicloud_images_image": {
+            "ubuntu": {
+                "most_recent": true,
+                "name": "Ubuntu 20.04 server 64bit with Tesla Driver 460.73.01 and CUDA 11.2",
+                "visibility": "public"
+            }
+        }
+    },
+    "locals": {
+        "az": [
+            "ap-southeast-3a",
+            "ap-southeast-3b"
+        ]
+    },
+    "resource": {
+        "huaweicloud_vpc": {
+            "vpc": {
+                "name": "${var.vpc_name}",
+                "cidr": "172.16.0.0/16"
+            }
+        },
+        "huaweicloud_vpc_subnet": {
+            "subnet": {
+                "depends_on": [
+                    "local.az"
+                ],
+                "availability_zone": "${local.az[0]}",
+                "name": "${var.vpc_name}-subnet",
+                "cidr": "172.16.1.0/24",
+                "gateway_ip": "172.16.1.1",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}"
+            }
+        },
+        "huaweicloud_networking_secgroup": {
+            "secgroup": {
+                "name": "${var.security_group_name}"
+            }
+        },
+        "huaweicloud_networking_secgroup_rule": {
+            "allow_ping": {
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup.id}",
+                "description": "Allows ping to test ECS connectivity",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "icmp",
+                "remote_ip_prefix": "0.0.0.0/0"
+            },
+            "aigc": {
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup.id}",
+                "description": "Allows access to AIGC applications",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": 7860,
+                "remote_ip_prefix": "0.0.0.0/0"
+            }
+        },
+        "huaweicloud_vpc_eip": {
+            "eip": {
+                "name": "${var.vpc_name}-eip",
+                "count": "${var.ecs_count}",
+                "bandwidth": {
+                    "name": "${var.vpc_name}-bandwidth",
+                    "share_type": "PER",
+                    "size": "${var.eip_bandwidth_size}",
+                    "charge_mode": "traffic"
+                },
+                "publicip": {
+                    "type": "5_bgp"
+                },
+                "charging_mode": "postPaid"
+            },
+            "elb_eip": {
+                "name": "${var.vpc_name}-eip",
+                "bandwidth": {
+                    "name": "${var.vpc_name}-bandwidth",
+                    "share_type": "PER",
+                    "size": 5,
+                    "charge_mode": "bandwidth"
+                },
+                "publicip": {
+                    "type": "5_bgp"
+                },
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}"
+            }
+        },
+        "huaweicloud_compute_instance": {
+            "ecs": {
+                "depends_on": [
+                    "local.az"
+                ],
+                "count": "${var.ecs_count}",
+                "name": "${var.ecs_name}-${count.index+1}",
+                "availability_zone": "${local.az[count.index % 2]}",
+                "image_id": "${data.huaweicloud_images_image.ubuntu.id}",
+                "flavor_id": "${var.ecs_flavor}",
+                "security_group_ids": [
+                    "${huaweicloud_networking_secgroup.secgroup.id}"
+                ],
+                "system_disk_type": "SAS",
+                "system_disk_size": 100,
+                "admin_pass": "${var.ecs_password}",
+                "delete_disks_on_termination": true,
+                "network": {
+                    "uuid": "${huaweicloud_vpc_subnet.subnet.id}"
+                },
+                "agent_list": "hss,ces",
+                "eip_id": "${huaweicloud_vpc_eip.eip[count.index].id}",
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "user_data": "#!/bin/bash\necho 'root:${var.ecs_password}' | chpasswd\nwget -P /tmp/ https://documentation-samples-4.obs.ap-southeast-3.myhuaweicloud.com/solution-as-code-moudle/building-high-availability-aigc-applications-with-stable-diffusion/userdata/aigc-applications.sh\nchmod 777 /tmp/aigc-applications.sh\nsh -x /tmp/aigc-applications.sh ${var.access_key_id} ${var.secret_access_key} ${var.image_bucket_name} >> /home/aigc.log\nrm -rf /tmp/aigc-applications.sh"
+            }
+        },
+        "huaweicloud_obs_bucket": {
+            "image_bucket": {
+                "acl": "private",
+                "bucket": "${var.image_bucket_name}",
+                "multi_az": true
+            }
+        },
+        "huaweicloud_lb_loadbalancer": {
+            "elb": {
+                "name": "${var.elb_name}",
+                "vip_subnet_id": "${huaweicloud_vpc_subnet.subnet.subnet_id}"
+            }
+        },
+        "huaweicloud_lb_listener": {
+            "listener_http": {
+                "loadbalancer_id": "${huaweicloud_lb_loadbalancer.elb.id}",
+                "protocol": "TCP",
+                "protocol_port": "7860"
+            }
+        },
+        "huaweicloud_lb_member": {
+            "member": {
+                "address": "${huaweicloud_compute_instance.ecs[count.index].access_ip_v4}",
+                "count": "${var.ecs_count}",
+                "pool_id": "${huaweicloud_lb_pool.group_http.id}",
+                "protocol_port": 7860,
+                "subnet_id": "${huaweicloud_vpc_subnet.subnet.subnet_id}",
+                "weight": 1
+            }
+        },
+        "huaweicloud_lb_monitor": {
+            "monitor_http": {
+                "delay": 5,
+                "max_retries": 3,
+                "pool_id": "${huaweicloud_lb_pool.group_http.id}",
+                "timeout": 3,
+                "type": "TCP",
+                "url_path": "/"
+            }
+        },
+        "huaweicloud_lb_pool": {
+            "group_http": {
+                "lb_method": "ROUND_ROBIN",
+                "listener_id": "${huaweicloud_lb_listener.listener_http.id}",
+                "name": "group_http",
+                "protocol": "TCP"
+            }
+        },
+        "huaweicloud_vpc_eip_associate": {
+            "eip": {
+                "port_id": "${huaweicloud_lb_loadbalancer.elb.vip_port_id}",
+                "public_ip": "${huaweicloud_vpc_eip.elb_eip.address}"
+            }
+        }
+    },
+    "output": {
+        "说明": {
+            "depends_on": [
+                "huaweicloud_vpc_eip.elb_eip"
+            ],
+            "value": "Enter http://${huaweicloud_vpc_eip.elb_eip.address}:7860/ to access the web UI."
+        }
+    }
+}
